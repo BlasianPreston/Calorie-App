@@ -25,3 +25,4 @@ class AuthService {
     return await ApiService.isLoggedIn();
   }
 }
+

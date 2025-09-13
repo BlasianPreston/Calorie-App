@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:calorie_tracking_app/navigation.dart';
-import 'package:calorie_tracking_app/main.dart';
 import 'package:calorie_tracking_app/sign_up.dart';
 import 'package:calorie_tracking_app/services/auth_service.dart';
 
