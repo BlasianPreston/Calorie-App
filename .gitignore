@@ -33,6 +33,17 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Xcode build artifacts
+*.pcm
+*.timestamp
+*.dia
+*.d
+*.scan
+*.swiftmodule
+**/Build/
+**/DerivedData/
+**/ExplicitPrecompiledModules/
+
 # Symbolication related
 app.*.symbols
 
