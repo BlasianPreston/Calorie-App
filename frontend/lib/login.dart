@@ -25,7 +25,7 @@ class _LoginDemoState extends State<LoginDemo> {
         _passwordController.text,
       );
       Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => Navigation()),
+          MaterialPageRoute(builder: (context) => const Navigation()),
           (route) => false);
     } catch (error) {
       ScaffoldMessenger.of(context)
@@ -42,6 +42,8 @@ class _LoginDemoState extends State<LoginDemo> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Center(child: Text("Login Page")),
+        backgroundColor: Colors.deepPurple,
+        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -54,15 +56,15 @@ class _LoginDemoState extends State<LoginDemo> {
                 child: SizedBox(
                   width: 200,
                   height: 150,
-                  /*decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(50.0)),*/
-                  child: Image.asset('assets/default.png'),
+                  child: Icon(
+                    Icons.restaurant_menu,
+                    size: 120,
+                    color: Colors.deepPurple.shade300,
+                  ),
                 ),
               ),
             ),
             Padding(
-              //padding: const EdgeInsets.only(left:15.0,right: 15.0,top:0,bottom: 0),
               padding: const EdgeInsets.symmetric(horizontal: 15),
               child: TextField(
                 controller: _emailController,
@@ -75,7 +77,6 @@ class _LoginDemoState extends State<LoginDemo> {
             Padding(
               padding: const EdgeInsets.only(
                   left: 15.0, right: 15.0, top: 15, bottom: 0),
-              //padding: EdgeInsets.symmetric(horizontal: 15),
               child: TextField(
                 obscureText: true,
                 controller: _passwordController,
@@ -90,13 +91,13 @@ class _LoginDemoState extends State<LoginDemo> {
               height: 50,
               width: 250,
               decoration: BoxDecoration(
-                  color: const Color.fromRGBO(52, 25, 83, 1),
+                  color: Colors.deepPurple,
                   borderRadius: BorderRadius.circular(20)),
               child: TextButton(
                 onPressed: _signIn,
                 child: _isLoading
                     ? const CircularProgressIndicator(
-                        color: Color.fromRGBO(52, 25, 83, 1))
+                        color: Colors.white)
                     : const Text(
                         'Login',
                         style: TextStyle(color: Colors.white, fontSize: 25),

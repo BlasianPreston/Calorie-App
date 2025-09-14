@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
-import 'package:calorie_tracking_app/pages/order_page.dart';
-import 'package:calorie_tracking_app/pages/delivery_page.dart';
+import 'package:calorie_tracking_app/pages/meal_upload_page.dart';
+import 'package:calorie_tracking_app/pages/meal_history_page.dart';
 import 'package:calorie_tracking_app/pages/account_page.dart';
-
 
 class Navigation extends StatefulWidget {
   const Navigation({super.key});
@@ -15,11 +14,13 @@ class Navigation extends StatefulWidget {
 
 class _NavigationState extends State<Navigation> {
   int _selectedIndex = 0;
-  static const TextStyle optionStyle =
-  TextStyle(fontSize: 30, fontWeight: FontWeight.w600);
+  static const TextStyle optionStyle = TextStyle(
+    fontSize: 30,
+    fontWeight: FontWeight.w600,
+  );
   static final List<Widget> _widgetOptions = <Widget>[
-    const OrderPage(),
-    const DeliveryPage(),
+    const MealUploadPage(),
+    const MealHistoryPage(),
     const AccountPage(),
   ];
 
@@ -27,17 +28,12 @@ class _NavigationState extends State<Navigation> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: _widgetOptions.elementAt(_selectedIndex),
-      ),
+      body: Center(child: _widgetOptions.elementAt(_selectedIndex)),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
-            BoxShadow(
-              blurRadius: 20,
-              color: Colors.black.withAlpha(25),
-            )
+            BoxShadow(blurRadius: 20, color: Colors.black.withAlpha(25)),
           ],
         ),
         child: SafeArea(
@@ -49,23 +45,20 @@ class _NavigationState extends State<Navigation> {
               gap: 8,
               activeColor: Colors.black,
               iconSize: 24,
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              duration: Duration(milliseconds: 400),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              duration: const Duration(milliseconds: 400),
               tabBackgroundColor: Colors.deepPurple.withAlpha(102),
               color: Colors.black,
               tabs: [
                 GButton(
-                  icon: LineAwesomeIcons.utensils_solid,
-                  text: 'Order',
-                ),
-                GButton(
                   icon: LineAwesomeIcons.camera_retro_solid,
-                  text: 'Delivery',
+                  text: 'Upload',
                 ),
                 GButton(
-                  icon: LineAwesomeIcons.user,
-                  text: 'Account',
+                  icon: LineAwesomeIcons.clock,
+                  text: 'History',
                 ),
+                GButton(icon: LineAwesomeIcons.user, text: 'Account'),
               ],
               selectedIndex: _selectedIndex,
               onTabChange: (index) {

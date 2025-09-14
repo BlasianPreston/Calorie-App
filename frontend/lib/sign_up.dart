@@ -26,7 +26,7 @@ class _SignUpPageState extends State<SignUpPage> {
     try {
       await AuthService.signup(email, password, name);
       Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => Navigation()),
+          MaterialPageRoute(builder: (context) => const Navigation()),
           (route) => false);
     } catch (error) {
       ScaffoldMessenger.of(context)
@@ -39,6 +39,8 @@ class _SignUpPageState extends State<SignUpPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sign Up'),
+        backgroundColor: Colors.deepPurple,
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -80,6 +82,10 @@ class _SignUpPageState extends State<SignUpPage> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _signUp,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                ),
                 child: const Text('Sign Up'),
               ),
             ],
