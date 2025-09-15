@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:calorie_tracking_app/models/meal.dart';
 import 'package:calorie_tracking_app/services/meal_service.dart';
@@ -194,12 +195,25 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
           if (meal.imagePath.isNotEmpty)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: Image.file(
-                File(meal.imagePath),
-                width: double.infinity,
-                height: 200,
-                fit: BoxFit.cover,
-              ),
+              child: kIsWeb
+                  ? Container(
+                      width: double.infinity,
+                      height: 200,
+                      color: Colors.grey.shade300,
+                      child: const Center(
+                        child: Icon(
+                          Icons.image,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    )
+                  : Image.file(
+                      File(meal.imagePath),
+                      width: double.infinity,
+                      height: 200,
+                      fit: BoxFit.cover,
+                    ),
             ),
           
           Padding(

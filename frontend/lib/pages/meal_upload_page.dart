@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:calorie_tracking_app/services/meal_service.dart';
-import 'package:calorie_tracking_app/models/meal.dart';
 
 class MealUploadPage extends StatefulWidget {
   const MealUploadPage({super.key});
@@ -15,6 +15,7 @@ class _MealUploadPageState extends State<MealUploadPage> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _commentsController = TextEditingController();
   File? _selectedImage;
+  Uint8List? _selectedImageBytes;
   bool _isUploading = false;
 
   Future<void> _pickImage() async {
@@ -27,19 +28,23 @@ class _MealUploadPageState extends State<MealUploadPage> {
       );
       
       if (image != null) {
+        final bytes = await image.readAsBytes();
         setState(() {
           _selectedImage = File(image.path);
+          _selectedImageBytes = bytes;
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: ${e.toString()}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: ${e.toString()}')),
+        );
+      }
     }
   }
 
   Future<void> _uploadMeal() async {
-    if (_selectedImage == null) {
+    if (_selectedImage == null && _selectedImageBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an image first')),
       );
@@ -52,7 +57,8 @@ class _MealUploadPageState extends State<MealUploadPage> {
 
     try {
       final meal = await MealService.uploadMeal(
-        imageFile: _selectedImage!,
+        imageFile: _selectedImage,
+        imageBytes: _selectedImageBytes,
         comments: _commentsController.text.trim().isEmpty 
             ? null 
             : _commentsController.text.trim(),
@@ -69,6 +75,7 @@ class _MealUploadPageState extends State<MealUploadPage> {
         // Reset form
         setState(() {
           _selectedImage = null;
+          _selectedImageBytes = null;
           _commentsController.clear();
         });
       }
@@ -136,12 +143,19 @@ class _MealUploadPageState extends State<MealUploadPage> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            _selectedImage!,
-                            width: double.infinity,
-                            height: 300,
-                            fit: BoxFit.cover,
-                          ),
+                          child: kIsWeb
+                              ? Image.memory(
+                                  _selectedImageBytes!,
+                                  width: double.infinity,
+                                  height: 300,
+                                  fit: BoxFit.cover,
+                                )
+                              : Image.file(
+                                  _selectedImage!,
+                                  width: double.infinity,
+                                  height: 300,
+                                  fit: BoxFit.cover,
+                                ),
                         ),
                         Positioned(
                           top: 8,
@@ -153,6 +167,7 @@ class _MealUploadPageState extends State<MealUploadPage> {
                               onPressed: () {
                                 setState(() {
                                   _selectedImage = null;
+                                  _selectedImageBytes = null;
                                 });
                               },
                             ),

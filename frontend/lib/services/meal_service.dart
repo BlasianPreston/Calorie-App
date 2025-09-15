@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:calorie_tracking_app/models/meal.dart';
@@ -7,7 +8,8 @@ import 'package:calorie_tracking_app/services/api_service.dart';
 
 class MealService {
   static Future<Meal> uploadMeal({
-    required File imageFile,
+    File? imageFile,
+    Uint8List? imageBytes,
     String? comments,
   }) async {
     try {
@@ -22,18 +24,29 @@ class MealService {
       final token = prefs.getString('auth_token');
       
       final headers = {
-        'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       };
       request.headers.addAll(headers);
 
       // Add image file
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'image',
-          imageFile.path,
-        ),
-      );
+      if (kIsWeb && imageBytes != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'image',
+            imageBytes,
+            filename: 'image.jpg',
+          ),
+        );
+      } else if (imageFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'image',
+            imageFile.path,
+          ),
+        );
+      } else {
+        throw Exception('No image provided');
+      }
 
       // Add comments if provided
       if (comments != null && comments.isNotEmpty) {
