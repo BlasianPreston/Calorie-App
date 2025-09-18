@@ -1,0 +1,8 @@
+# Environment variables for the Calorie Tracking App Backend
+
+# Flask secret key for session management
+SECRET_KEY=your-secret-key-here
+
+# Google Gemini AI API key
+# Get your API key from: https://makersuite.google.com/app/apikey
+GEMINI_API_KEY=your-gemini-api-key-here

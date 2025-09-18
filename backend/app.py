@@ -1,31 +1,38 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
 import os
 import uuid
 import base64
 from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
+from models import db, User, Meal
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=['http://127.0.0.1:*', 'http://localhost:*'], supports_credentials=True)  # Enable CORS for Flutter app
+CORS(app, origins=['*'], supports_credentials=True)  # Enable CORS for Flutter app
 
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///calorie_tracking.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize database
+db.init_app(app)
 
 # Configure Gemini AI
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 
-# In-memory storage for demo (use database in production)
-meals_db = []
-users_db = {}
-
 # Initialize Gemini model
 model = genai.GenerativeModel('gemini-1.5-flash')
+
+# Create database tables
+with app.app_context():
+    db.create_all()
 
 def analyze_meal_image(image_data, comments=None):
     """Analyze meal image using Gemini AI to estimate calories"""
@@ -34,15 +41,26 @@ def analyze_meal_image(image_data, comments=None):
         image_base64 = base64.b64encode(image_data).decode('utf-8')
         
         prompt = f"""
-        Analyze this food image and provide:
-        1. A detailed description of the food items visible
-        2. An estimate of the total calories in the meal
-        3. Breakdown of major food components and their approximate calorie contributions
+        You are a nutrition expert analyzing food images. Please analyze this image and provide accurate calorie estimates.
         
-        Please be as accurate as possible with calorie estimation.
-        Return the response in JSON format with keys: description, total_calories, breakdown, confidence_score.
+        Instructions:
+        1. Identify all food items visible in the image
+        2. Estimate the portion size of each item
+        3. Calculate calories based on standard nutritional values
+        4. Be conservative and realistic with estimates
+        5. Consider that a medium banana is typically 80-100 calories, an apple is 60-80 calories, etc.
+        
+        Please respond in this exact JSON format:
+        {{
+            "description": "Brief description of what you see",
+            "total_calories": [number],
+            "breakdown": "Detailed breakdown of each food item and its calories",
+            "confidence_score": [number between 0 and 1]
+        }}
         
         {f"Additional context from user: {comments}" if comments else ""}
+        
+        Remember: Be accurate and realistic with calorie estimates. A single piece of fruit should not be 500+ calories.
         """
         
         # Generate content using Gemini
@@ -54,15 +72,51 @@ def analyze_meal_image(image_data, comments=None):
             }
         ])
         
-        # Parse response (in a real app, you'd want more robust parsing)
-        result = {
-            "description": "AI analysis of the meal",
-            "total_calories": 500,  # Placeholder - would parse from actual response
-            "breakdown": "Various food items detected",
-            "confidence_score": 0.85
-        }
+        # Parse the actual response from Gemini
+        response_text = response.text.strip()
+        print(f"Gemini response: {response_text}")
         
-        return result
+        # Check if we got a valid response
+        if not response_text or len(response_text) < 10:
+            print("Warning: Empty or very short response from Gemini")
+            return {
+                "description": "Unable to analyze image - empty response",
+                "total_calories": 0,
+                "breakdown": "Analysis failed - no response from AI",
+                "confidence_score": 0.0
+            }
+        
+        # Try to extract information from the response
+        try:
+            # Look for JSON in the response
+            import re
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                import json
+                parsed_response = json.loads(json_match.group())
+                return {
+                    "description": parsed_response.get("description", "Food analysis"),
+                    "total_calories": float(parsed_response.get("total_calories", 0)),
+                    "breakdown": parsed_response.get("breakdown", "Analysis completed"),
+                    "confidence_score": float(parsed_response.get("confidence_score", 0.8))
+                }
+        except Exception as parse_error:
+            print(f"Error parsing JSON response: {parse_error}")
+        
+        # Fallback: try to extract calories from text
+        calories_match = re.search(r'(\d+(?:\.\d+)?)\s*calories?', response_text, re.IGNORECASE)
+        calories = float(calories_match.group(1)) if calories_match else 0
+        
+        # Extract description (first sentence or line)
+        description_lines = response_text.split('\n')
+        description = description_lines[0].strip() if description_lines else "Food analysis"
+        
+        return {
+            "description": description,
+            "total_calories": calories,
+            "breakdown": response_text,
+            "confidence_score": 0.8 if calories > 0 else 0.3
+        }
     except Exception as e:
         print(f"Error analyzing image: {e}")
         return {
@@ -86,19 +140,25 @@ def login():
     email = data.get('email')
     password = data.get('password')
     
-    # Simple demo authentication
     if email and password:
-        user_id = str(uuid.uuid4())
-        users_db[user_id] = {
-            'email': email,
-            'name': email.split('@')[0],
-            'created_at': datetime.now().isoformat()
-        }
+        # Check if user exists
+        user = User.query.filter_by(email=email).first()
+        
+        if not user:
+            # Create new user for demo purposes
+            user_id = str(uuid.uuid4())
+            user = User(
+                id=user_id,
+                email=email,
+                name=email.split('@')[0]
+            )
+            db.session.add(user)
+            db.session.commit()
         
         return jsonify({
             'message': 'Login successful',
-            'token': f'demo_token_{user_id}',
-            'user': users_db[user_id]
+            'token': f'demo_token_{user.id}',
+            'user': user.to_dict()
         })
     
     return jsonify({'message': 'Invalid credentials'}), 401
@@ -111,17 +171,24 @@ def signup():
     name = data.get('name')
     
     if email and password and name:
+        # Check if user already exists
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            return jsonify({'message': 'User already exists'}), 400
+        
         user_id = str(uuid.uuid4())
-        users_db[user_id] = {
-            'email': email,
-            'name': name,
-            'created_at': datetime.now().isoformat()
-        }
+        user = User(
+            id=user_id,
+            email=email,
+            name=name
+        )
+        db.session.add(user)
+        db.session.commit()
         
         return jsonify({
             'message': 'Signup successful',
             'token': f'demo_token_{user_id}',
-            'user': users_db[user_id]
+            'user': user.to_dict()
         })
     
     return jsonify({'message': 'Missing required fields'}), 400
@@ -144,23 +211,29 @@ def upload_meal():
         # Analyze with Gemini AI
         analysis = analyze_meal_image(image_data, comments)
         
-        # Create meal record
+        # Create meal record in database
         meal_id = str(uuid.uuid4())
-        meal = {
-            'id': meal_id,
-            'image_path': f'uploads/{meal_id}.jpg',  # In production, save to file system
-            'image_url': None,  # Would be actual URL in production
-            'comments': comments if comments else None,
-            'calories': analysis['total_calories'],
-            'created_at': datetime.now().isoformat(),
-            'gemini_analysis': f"Description: {analysis['description']}\nBreakdown: {analysis['breakdown']}\nConfidence: {analysis['confidence_score']:.2f}"
-        }
+        # For demo, we'll use the first user (in production, get from auth token)
+        user = User.query.first()
+        if not user:
+            return jsonify({'message': 'No users found'}), 400
         
-        meals_db.append(meal)
+        meal = Meal(
+            id=meal_id,
+            user_id=user.id,
+            image_path=f'uploads/{meal_id}.jpg',  # In production, save to file system
+            image_url=None,  # Would be actual URL in production
+            comments=comments if comments else None,
+            calories=analysis['total_calories'],
+            gemini_analysis=f"Description: {analysis['description']}\nBreakdown: {analysis['breakdown']}\nConfidence: {analysis['confidence_score']:.2f}"
+        )
+        
+        db.session.add(meal)
+        db.session.commit()
         
         return jsonify({
             'message': 'Meal uploaded successfully',
-            'meal': meal
+            'meal': meal.to_dict()
         })
         
     except Exception as e:
@@ -169,23 +242,61 @@ def upload_meal():
 @app.route('/meals/history', methods=['GET'])
 def get_meal_history():
     # In production, filter by authenticated user
+    meals = Meal.query.order_by(Meal.created_at.desc()).all()
     return jsonify({
-        'meals': meals_db
+        'meals': [meal.to_dict() for meal in meals]
     })
 
 @app.route('/meals/<meal_id>', methods=['GET'])
 def get_meal(meal_id):
-    meal = next((m for m in meals_db if m['id'] == meal_id), None)
+    meal = Meal.query.get(meal_id)
     if not meal:
         return jsonify({'message': 'Meal not found'}), 404
     
-    return jsonify({'meal': meal})
+    return jsonify({'meal': meal.to_dict()})
 
 @app.route('/meals/<meal_id>', methods=['DELETE'])
 def delete_meal(meal_id):
-    global meals_db
-    meals_db = [m for m in meals_db if m['id'] != meal_id]
+    meal = Meal.query.get(meal_id)
+    if not meal:
+        return jsonify({'message': 'Meal not found'}), 404
+    
+    db.session.delete(meal)
+    db.session.commit()
     return jsonify({'message': 'Meal deleted successfully'})
+
+@app.route('/user/profile', methods=['GET'])
+def get_user_profile():
+    # In production, you would validate the token and get user from database
+    # For demo purposes, we'll return the first user or create a default
+    user = User.query.first()
+    if not user:
+        return jsonify({'message': 'No user found'}), 404
+    
+    # Calculate stats from database
+    user_meals = Meal.query.filter_by(user_id=user.id).all()
+    total_meals = len(user_meals)
+    total_calories = sum(meal.calories for meal in user_meals)
+    average_calories = total_calories / total_meals if total_meals > 0 else 0
+    
+    # Calculate today's calories
+    from datetime import datetime, date
+    today = date.today()
+    today_meals = Meal.query.filter(
+        Meal.user_id == user.id,
+        db.func.date(Meal.created_at) == today
+    ).all()
+    today_calories = sum(meal.calories for meal in today_meals)
+    
+    return jsonify({
+        'user': user.to_dict(),
+        'stats': {
+            'total_meals': total_meals,
+            'total_calories': total_calories,
+            'average_calories': round(average_calories, 1),
+            'today_calories': today_calories
+        }
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8000)
