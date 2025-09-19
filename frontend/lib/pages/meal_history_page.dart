@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:calorie_tracking_app/models/meal.dart';
 import 'package:calorie_tracking_app/services/meal_service.dart';
+import 'package:calorie_tracking_app/config/app_config.dart';
 
 class MealHistoryPage extends StatefulWidget {
   const MealHistoryPage({super.key});
@@ -89,10 +90,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadMeals,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadMeals),
         ],
       ),
       body: _buildBody(),
@@ -101,9 +99,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_error.isNotEmpty) {
@@ -111,18 +107,11 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red.shade300,
-            ),
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
               'Error loading meals',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.red.shade700,
-              ),
+              style: TextStyle(fontSize: 18, color: Colors.red.shade700),
             ),
             const SizedBox(height: 8),
             Text(
@@ -131,10 +120,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
               style: TextStyle(color: Colors.red.shade600),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadMeals,
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: _loadMeals, child: const Text('Retry')),
           ],
         ),
       );
@@ -145,18 +131,11 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.restaurant_menu,
-              size: 64,
-              color: Colors.grey,
-            ),
+            Icon(Icons.restaurant_menu, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text(
               'No meals yet',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 18, color: Colors.grey),
             ),
             SizedBox(height: 8),
             Text(
@@ -185,29 +164,50 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Image
-          if (meal.imagePath.isNotEmpty)
+          if (meal.imagePath.isNotEmpty || meal.imageUrl != null)
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
               child: kIsWeb
-                  ? Container(
-                      width: double.infinity,
-                      height: 200,
-                      color: Colors.grey.shade300,
-                      child: const Center(
-                        child: Icon(
-                          Icons.image,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    )
+                  ? (meal.imageUrl != null
+                        ? Image.network(
+                            '${AppConfig.apiBaseUrl}${meal.imageUrl}',
+                            width: double.infinity,
+                            height: 200,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: double.infinity,
+                                height: 200,
+                                color: Colors.grey.shade300,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    size: 64,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : Container(
+                            width: double.infinity,
+                            height: 200,
+                            color: Colors.grey.shade300,
+                            child: const Center(
+                              child: Icon(
+                                Icons.image,
+                                size: 64,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ))
                   : Image.file(
                       File(meal.imagePath),
                       width: double.infinity,
@@ -215,7 +215,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
                       fit: BoxFit.cover,
                     ),
             ),
-          
+
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -251,9 +251,9 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 12),
-                
+
                 // Comments
                 if (meal.comments != null && meal.comments!.isNotEmpty)
                   Container(
@@ -268,11 +268,12 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
                       style: const TextStyle(fontSize: 14),
                     ),
                   ),
-                
+
                 const SizedBox(height: 12),
-                
+
                 // Gemini analysis
-                if (meal.geminiAnalysis != null && meal.geminiAnalysis!.isNotEmpty)
+                if (meal.geminiAnalysis != null &&
+                    meal.geminiAnalysis!.isNotEmpty)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
@@ -313,9 +314,9 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
                       ],
                     ),
                   ),
-                
+
                 const SizedBox(height: 12),
-                
+
                 // Delete button
                 Align(
                   alignment: Alignment.centerRight,
@@ -323,9 +324,7 @@ class _MealHistoryPageState extends State<MealHistoryPage> {
                     onPressed: () => _deleteMeal(meal),
                     icon: const Icon(Icons.delete_outline, size: 16),
                     label: const Text('Delete'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red,
-                    ),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
                   ),
                 ),
               ],

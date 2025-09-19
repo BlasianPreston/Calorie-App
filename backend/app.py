@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 import os
@@ -33,6 +33,18 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 # Create database tables
 with app.app_context():
     db.create_all()
+    
+    # Migrate existing meals to add imageUrl if missing
+    existing_meals = Meal.query.filter(Meal.image_url.is_(None)).all()
+    for meal in existing_meals:
+        if meal.image_path and os.path.exists(meal.image_path):
+            # Extract filename from path
+            filename = os.path.basename(meal.image_path)
+            meal.image_url = f'/images/{filename}'
+    
+    if existing_meals:
+        db.session.commit()
+        print(f"Updated {len(existing_meals)} existing meals with image URLs")
 
 def analyze_meal_image(image_data, comments=None):
     """Analyze meal image using Gemini AI to estimate calories"""
@@ -218,11 +230,25 @@ def upload_meal():
         if not user:
             return jsonify({'message': 'No users found'}), 400
         
+        # Create uploads directory if it doesn't exist
+        uploads_dir = 'uploads'
+        if not os.path.exists(uploads_dir):
+            os.makedirs(uploads_dir)
+        
+        # Save image to filesystem
+        image_filename = f'{meal_id}.jpg'
+        image_path = os.path.join(uploads_dir, image_filename)
+        with open(image_path, 'wb') as f:
+            f.write(image_data)
+        
+        # Create image URL for web access
+        image_url = f'/images/{image_filename}'
+        
         meal = Meal(
             id=meal_id,
             user_id=user.id,
-            image_path=f'uploads/{meal_id}.jpg',  # In production, save to file system
-            image_url=None,  # Would be actual URL in production
+            image_path=image_path,
+            image_url=image_url,
             comments=comments if comments else None,
             calories=analysis['total_calories'],
             gemini_analysis=f"Description: {analysis['description']}\nBreakdown: {analysis['breakdown']}\nConfidence: {analysis['confidence_score']:.2f}"
@@ -261,9 +287,24 @@ def delete_meal(meal_id):
     if not meal:
         return jsonify({'message': 'Meal not found'}), 404
     
+    # Delete the image file if it exists
+    if meal.image_path and os.path.exists(meal.image_path):
+        try:
+            os.remove(meal.image_path)
+        except Exception as e:
+            print(f"Error deleting image file: {e}")
+    
     db.session.delete(meal)
     db.session.commit()
     return jsonify({'message': 'Meal deleted successfully'})
+
+@app.route('/images/<filename>')
+def serve_image(filename):
+    """Serve uploaded images"""
+    try:
+        return send_from_directory('uploads', filename)
+    except FileNotFoundError:
+        return jsonify({'message': 'Image not found'}), 404
 
 @app.route('/user/profile', methods=['GET'])
 def get_user_profile():
