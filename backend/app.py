@@ -24,6 +24,22 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Initialize database
 db.init_app(app)
 
+# Simple auth helper for demo tokens in the form: "demo_token_{user_id}"
+def get_authenticated_user():
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+    token = auth_header.split(' ', 1)[1]
+    prefix = 'demo_token_'
+    if not token.startswith(prefix):
+        return None
+    user_id = token[len(prefix):]
+    try:
+        user = User.query.get(user_id)
+        return user
+    except Exception:
+        return None
+
 # Configure Gemini AI
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 
@@ -207,6 +223,11 @@ def signup():
 
 @app.route('/meals/upload', methods=['POST'])
 def upload_meal():
+    # Require authenticated user
+    current_user = get_authenticated_user()
+    if not current_user:
+        return jsonify({'message': 'Unauthorized'}), 401
+
     if 'image' not in request.files:
         return jsonify({'message': 'No image file provided'}), 400
     
@@ -225,10 +246,6 @@ def upload_meal():
         
         # Create meal record in database
         meal_id = str(uuid.uuid4())
-        # For demo, we'll use the first user (in production, get from auth token)
-        user = User.query.first()
-        if not user:
-            return jsonify({'message': 'No users found'}), 400
         
         # Create uploads directory if it doesn't exist
         uploads_dir = 'uploads'
@@ -246,7 +263,7 @@ def upload_meal():
         
         meal = Meal(
             id=meal_id,
-            user_id=user.id,
+            user_id=current_user.id,
             image_path=image_path,
             image_url=image_url,
             comments=comments if comments else None,
@@ -267,8 +284,11 @@ def upload_meal():
 
 @app.route('/meals/history', methods=['GET'])
 def get_meal_history():
-    # In production, filter by authenticated user
-    meals = Meal.query.order_by(Meal.created_at.desc()).all()
+    # Filter by authenticated user
+    current_user = get_authenticated_user()
+    if not current_user:
+        return jsonify({'message': 'Unauthorized'}), 401
+    meals = Meal.query.filter_by(user_id=current_user.id).order_by(Meal.created_at.desc()).all()
     return jsonify({
         'meals': [meal.to_dict() for meal in meals]
     })
@@ -308,11 +328,10 @@ def serve_image(filename):
 
 @app.route('/user/profile', methods=['GET'])
 def get_user_profile():
-    # In production, you would validate the token and get user from database
-    # For demo purposes, we'll return the first user or create a default
-    user = User.query.first()
+    # Use authenticated user from token
+    user = get_authenticated_user()
     if not user:
-        return jsonify({'message': 'No user found'}), 404
+        return jsonify({'message': 'Unauthorized'}), 401
     
     # Calculate stats from database
     user_meals = Meal.query.filter_by(user_id=user.id).all()
